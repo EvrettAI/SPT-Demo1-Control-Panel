@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Fieldshaping Control Panel</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+        :root {
+            --bg-color: #1a1d21; --container-bg: #2a2d31; --header-bg: #3a3d41;
+            --primary-color: #76b900; /* NVIDIA Green */ --secondary-color: #00b0ff;
+            --text-color: #f0f0f0; --label-color: #b0b0b0; --border-color: #4a4d51;
+        }
+        body {
+            font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color);
+            display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 20px;
+        }
+        .panel-container {
+            background-color: var(--container-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            width: 100%; max-width: 800px;
+        }
+        .panel-header {
+            background-color: var(--header-bg); padding: 15px 25px; border-bottom: 1px solid var(--border-color);
+            border-radius: 12px 12px 0 0;
+        }
+        .panel-header h2 { margin: 0; color: var(--primary-color); font-size: 1.5rem; }
+        .panel-header p { margin: 5px 0 0; color: var(--label-color); font-size: 0.9rem; }
+        .panel-body { padding: 25px; }
+        .config-section { margin-bottom: 30px; padding: 20px; border: 1px solid var(--border-color); border-radius: 8px; }
+        .config-section h3 { margin-top: 0; color: var(--secondary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        label { display: block; font-weight: 500; color: var(--label-color); margin-bottom: 10px; }
+        select, input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);
+            background-color: #3a3d41; color: var(--text-color); font-size: 1rem; box-sizing: border-box; }
+        .slider-group { margin-bottom: 15px; }
+        .slider-label { display: flex; justify-content: space-between; align-items: center; }
+        .slider-value { font-weight: 600; font-family: 'Roboto Mono', monospace; color: var(--primary-color); }
+        pre { background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px;
+              font-family: 'Roboto Mono', monospace; white-space: pre-wrap; word-wrap: break-word; font-size: 0.85rem; }
+        .code-comment { color: #6a9955; }
+        button {
+            width: 100%; padding: 15px; font-size: 1.1rem; font-weight: 600; color: #000;
+            background-color: var(--primary-color); border: none; border-radius: 8px; cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover { background-color: #92e000; }
+        #deployment-summary { margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="panel-container">
+        <div class="panel-header">
+            <h2>NVIDIA Fieldshaping Control Panel</h2>
+            <p>Configure and deploy relationally-aware AI models on the NVIDIA Inference Stack</p>
+        </div>
+        <div class="panel-body">
+            <div class="config-section">
+                <h3>1. Base Model &amp; Deployment Target</h3>
+                <label for="base-model">Select Base Model</label>
+                <select id="base-model">
+                    <option>Llama-3-70B-Instruct</option>
+                    <option>Mistral-Large</option>
+                    <option>Proprietary-Finance-Model-v2</option>
+                </select>
+                <label for="deployment-target" style="margin-top: 15px;">Deployment Target</label>
+                <select id="deployment-target">
+                    <option>NVIDIA Triton Inference Server</option>
+                </select>
+            </div>
+
+            <div class="config-section">
+                <h3>2. SPT Fieldshaping Configuration</h3>
+                <label for="rootfield">Select Certified Rootfield (Preset)</label>
+                <select id="rootfield" onchange="applyRootfield()">
+                    <option value="custom">Custom Configuration</option>
+                    <option value="support">Customer Support Agent</option>
+                    <option value="analyst">Financial Analyst</option>
+                    <option value="tutor">Personalized Tutor</option>
+                </select>
+                <div style="margin-top: 20px;">
+                    <div class="slider-group">
+                        <div class="slider-label"><label>Formality</label><span id="formalityValue" class="slider-value">5</span></div>
+                        <input type="range" id="formality" min="0" max="10" value="5" oninput="updateConfig()">
+                    </div>
+                    <div class="slider-group">
+                        <div class="slider-label"><label>Empathy</label><span id="empathyValue" class="slider-value">5</span></div>
+                        <input type="range" id="empathy" min="0" max="10" value="5" oninput="updateConfig()">
+                    </div>
+                    <div class="slider-group">
+                        <div class="slider-label"><label>Continuity</label><span id="continuityValue" class="slider-value">5</span></div>
+                        <input type="range" id="continuity" min="0" max="10" value="5" oninput="updateConfig()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>3. Generated Configuration &amp; SDK Usage</h3>
+                <label>Generated Fieldcode (JSON Config)</label>
+                <pre id="fieldcode-output"></pre>
+                <label style="margin-top: 15px;">Python SDK Example</label>
+                <pre id="sdk-output"></pre>
+            </div>
+
+            <button onclick="runDeployment()">Generate Deployment Summary</button>
+
+            <div id="deployment-summary"></div>
+        </div>
+    </div>
+
+    <script>
+        const rootfields = {
+            support: { formality: 7, empathy: 9, continuity: 8 },
+            analyst: { formality: 9, empathy: 2, continuity: 7 },
+            tutor: { formality: 6, empathy: 8, continuity: 9 },
+        };
+
+        function updateSliderDisplay() {
+            ['formality', 'empathy', 'continuity'].forEach(id => {
+                document.getElementById(id + 'Value').textContent = document.getElementById(id).value;
+            });
+        }
+
+        function applyRootfield() {
+            const selected = document.getElementById('rootfield').value;
+            if (selected !== 'custom') {
+                const config = rootfields[selected];
+                Object.keys(config).forEach(id => {
+                    document.getElementById(id).value = config[id];
+                });
+            }
+            updateConfig();
+        }
+
+        function updateConfig() {
+            updateSliderDisplay();
+            const rootfield = document.getElementById('rootfield').value;
+            const model = document.getElementById('base-model').value;
+
+            const config = {
+                rootfield: rootfield,
+                field_eq: {
+                    formality: parseInt(document.getElementById('formality').value),
+                    empathy: parseInt(document.getElementById('empathy').value),
+                    continuity: parseInt(document.getElementById('continuity').value),
+                }
+            };
+            
+            document.getElementById('fieldcode-output').textContent = JSON.stringify(config, null, 2);
+            
+            document.getElementById('sdk-output').innerHTML = 
+`<span class="code-comment"># Your application backend code</span>
+<span style="color: #c586c0;">import</span> nvidia.spt <span style="color: #c586c0;">as</span> spt
+
+<span class="code-comment"># Load the generated config</span>
+field_config = ${JSON.stringify(config, null, 2)}
+
+<span class="code-comment"># Deploy the model with SPT enabled</span>
+endpoint = spt.deploy(
+    model_name=<span style="color: #ce9178;">"${model}"</span>,
+    field_config=field_config
+)
+
+print(f<span style="color: #ce9178;">"Deployment successful: {endpoint.url}"</span>)`;
+        }
+
+        function runDeployment() {
+            const model = document.getElementById('base-model').value;
+            const fieldcode = document.getElementById('fieldcode-output').textContent;
+            
+            // Dummy shaping logic for sample response
+            let sampleResponse = "This is a sample response from the model.";
+            const config = JSON.parse(fieldcode);
+            if (config.field_eq.empathy > 7) sampleResponse = "We understand this is important, so... " + sampleResponse;
+            if (config.field_eq.formality > 7) sampleResponse = "Per your request, please be advised: " + sampleResponse;
+            if (config.field_eq.continuity > 7) sampleResponse = "Building on previous data, " + sampleResponse;
+
+
+            document.getElementById('deployment-summary').innerHTML = `
+                <div class="config-section">
+                    <h3>Deployment Summary</h3>
+                    <p><strong>Endpoint URL:</strong> <span style="color: var(--secondary-color);">https://api.nv-us-east-1.cloud/spt/depl-a7b3c9f1</span></p>
+                    <p><strong>Base Model:</strong> ${model}</p>
+                    <p><strong>SPT Status:</strong> <span style="color: var(--primary-color);">ACTIVE</span></p>
+                    <label style="margin-top:15px;">Applied Fieldcode:</label>
+                    <pre>${fieldcode}</pre>
+                    <label style="margin-top:15px;">Validation (Sample Response):</label>
+                    <pre style="background-color: #111;">${sampleResponse}</pre>
+                </div>
+            `;
+        }
+
+        // Initial population
+        updateConfig();
+    </script>
+</body>
+</html>
